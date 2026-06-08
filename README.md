@@ -15,8 +15,8 @@ A lightweight, privacy-first, local Markdown editor built as a single HTML file.
 * **System-Aware Theming:** Fully supports Light and Dark modes, automatically syncing with your operating system's default preference on boot.
 
 <p align=-"center">
-  <img src="screenshot/smde_1.png" width="470" alt="Simply Markdown Editor screenshot #1" align="left"> 
-  <img src="screenshot/smde_2.png" width="470" alt="Simply Markdown Editor screenshot #2">
+  <img src="screenshot/smde_1.png" width="320" alt="Simply Markdown Editor screenshot #1" align="left"> 
+  <img src="screenshot/smde_2.png" width="320" alt="Simply Markdown Editor screenshot #2">
 </p>
 
 ## How to Run
