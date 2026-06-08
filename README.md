@@ -14,9 +14,11 @@ A lightweight, privacy-first, local Markdown editor built as a single HTML file.
 * **Export to HTML:** Instantly compile your Markdown document into a standalone, beautifully styled HTML file.
 * **System-Aware Theming:** Fully supports Light and Dark modes, automatically syncing with your operating system's default preference on boot.
 
+## Screenshot
+
 <p align=-"center">
-  <img src="screenshot/smde_1.png" width="320" alt="Simply Markdown Editor screenshot #1" align="left"> 
-  <img src="screenshot/smde_2.png" width="320" alt="Simply Markdown Editor screenshot #2">
+  <img src="screenshot/smde_2.png" width="360" alt="Simply Markdown Editor screenshot Dark mode" align="left"> 
+  <img src="screenshot/smde_1.png" width="360" alt="Simply Markdown Editor screenshot Light mode">
 </p>
 
 ## How to Run
