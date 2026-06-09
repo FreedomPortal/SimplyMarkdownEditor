@@ -26,9 +26,11 @@ A lightweight, privacy-first, local Markdown editor built as a single HTML file.
 This app is designed to be completely portable with zero installation required.
 
 ### Method 1: The Portable Way (Easiest)
-Simply double-click the `index.html` file to open it in your browser (Chrome, Edge, Brave, or Opera). The app will run perfectly. 
+Simply download <a href="https://github.com/FreedomPortal/SimplyMarkdownEditor/releases/download/v1.0.0/simply-markdown-editor.zip">simply-markdown-editor.zip</a> to your machine and extract to your desired folder. <br />
+Then double-click the `index.html` file to open it in your browser (Chrome, Edge, Brave, or Opera). The app will run perfectly. It's that simple!
+
 * *Note: Because local files don't have a web domain, your browser cannot "remember" your workspace permissions after you close the tab. You will just need to re-select your Workspace folder each time you launch the app.*
-* Simply download <a href="https://github.com/FreedomPortal/SimplyMarkdownEditor/releases/download/v1.0.0/simply-markdown-editor.zip">simply-markdown-editor.zip</a> to your machine and extract at your desired folder. Run the app locally offline by double-click 'index.html'. It's that simple!
+
 
 ### Method 2: The Server Way (For persistent permissions)
 If you want the browser to remember your workspace folder between sessions so you don't have to re-open it every time, you can serve the file over a local server (`http://localhost`):
