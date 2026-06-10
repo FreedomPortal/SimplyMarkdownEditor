@@ -54,18 +54,24 @@
 
         header {
             background-color: var(--header-bg); color: var(--text-color);
-            padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 20px; display: flex; justify-content: space-between; 
+            align-items: center; flex-wrap: wrap; gap: 15px; /* Allows wrapping on small screens */
         }
 
-        h1 { margin: 0; font-size: 1.2rem; min-width: max-content; margin-right: 20px; }
+        h1 { margin: 0; font-size: 1.2rem; min-width: max-content; }
 
-        .toolbar-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .toolbar-group { 
+            display: flex; gap: 10px; align-items: center; 
+            flex-wrap: nowrap; /* Keeps buttons strictly on a single line */
+            margin-left: auto; /* Pushes to the right if wrapped to a second line */
+        }
+        
         .header-divider { width: 1px; height: 24px; background-color: rgba(255,255,255,0.2); margin: 0 5px; }
 
         button {
             background-color: #3498db; color: white; border: none; padding: 6px 14px; 
             border-radius: 4px; cursor: pointer; font-weight: 600; transition: 0.2s;
-            font-size: 0.9rem;
+            font-size: 0.7rem;
         }
         button:hover { background-color: #2980b9; }
         .btn-secondary { background-color: #555; }
