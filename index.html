@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simply Markdown Editor v1.0</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+    <link rel="stylesheet" href="toastui-editor.min.css" />
+    <link rel="stylesheet" href="toastui-editor-dark.min.css" />
+    
+    <!-- ORIGINAL SOURCE ONLINE
+    **<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css" />
+    **<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/theme/toastui-editor-dark.min.css" />
+    -->
+    
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --sidebar-bg: #eceff1;
+            --header-bg: #2c3e50;
+            --text-color: #ecf0f1;
+            --text-main: #333333;
+            --item-bg: transparent;
+            --item-hover-bg: #dbe2e8;
+            --item-active-bg: #3498db;
+            --item-active-text: #ffffff;
+            --border-color: #cccccc;
+            --input-bg: #ffffff;
+            --tree-line: #bdc3c7;
+        }
+
+        body.dark-theme {
+            --bg-color: #1e1e1e;
+            --sidebar-bg: #252526;
+            --header-bg: #111111;
+            --text-color: #cccccc;
+            --text-main: #cccccc;
+            --item-hover-bg: #37373d;
+            --item-active-bg: #094771;
+            --item-active-text: #ffffff;
+            --border-color: #444444;
+            --input-bg: #3c3c3c;
+            --tree-line: #444444;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color); color: var(--text-main);
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        header {
+            background-color: var(--header-bg); color: var(--text-color);
+            padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
+        }
+
+        h1 { margin: 0; font-size: 1.2rem; min-width: max-content; margin-right: 20px; }
+
+        .toolbar-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .header-divider { width: 1px; height: 24px; background-color: rgba(255,255,255,0.2); margin: 0 5px; }
+
+        button {
+            background-color: #3498db; color: white; border: none; padding: 6px 14px; 
+            border-radius: 4px; cursor: pointer; font-weight: 600; transition: 0.2s;
+            font-size: 0.9rem;
+        }
+        button:hover { background-color: #2980b9; }
+        .btn-secondary { background-color: #555; }
+        .btn-secondary:hover { background-color: #777; }
+
+        .view-modes {
+            display: flex; border-radius: 4px; overflow: hidden; border: 1px solid rgba(255,255,255,0.3);
+        }
+        .view-modes button {
+            background-color: transparent; border-radius: 0; margin: 0; 
+            color: #ccc; font-weight: 500; border: none;
+        }
+        .view-modes button:hover { background-color: rgba(255,255,255,0.1); }
+        .view-modes button.active { background-color: #3498db; color: white; font-weight: 600; }
+
+        #main-layout { display: flex; flex-grow: 1; height: calc(100vh - 50px); }
+
+        #sidebar {
+            width: 280px; background-color: var(--sidebar-bg); border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column; flex-shrink: 0;
+            transition: margin-left 0.2s ease; 
+        }
+        
+        #sidebar.collapsed {
+            margin-left: -281px; 
+        }
+
+        #workspace-path {
+            font-size: 0.75rem; color: #888; margin-top: 10px;
+            word-break: break-all; font-family: monospace;
+        }
+
+        .sidebar-search-container {
+            padding: 15px; border-bottom: 1px solid var(--border-color); background-color: var(--sidebar-bg);
+        }
+        #file-search {
+            width: 100%; padding: 8px 12px; box-sizing: border-box; border: 1px solid var(--border-color);
+            border-radius: 4px; background-color: var(--input-bg); color: var(--text-main); font-size: 0.9rem;
+        }
+
+        .sidebar-scroll-area { 
+            flex-grow: 1; overflow-y: auto; padding: 10px; 
+            overflow-anchor: none; 
+        }
+        .sidebar-scroll-area::-webkit-scrollbar { width: 8px; }
+        .sidebar-scroll-area::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+
+        details { margin-top: 2px; }
+        summary {
+            cursor: pointer; padding: 6px 8px; border-radius: 4px;
+            font-size: 0.9rem; font-weight: 600; user-select: none;
+            color: var(--text-main); transition: background-color 0.1s;
+            display: flex; align-items: center; gap: 6px;
+        }
+        summary:hover { background-color: var(--item-hover-bg); }
+        .folder-content {
+            margin-left: 11px; padding-left: 10px; border-left: 1px solid var(--tree-line);
+            display: flex; flex-direction: column;
+        }
+        .file-item {
+            padding: 6px 8px; margin-top: 2px; background-color: var(--item-bg); color: var(--text-main);
+            border-radius: 4px; cursor: pointer; font-size: 0.85rem;
+            word-break: break-all; transition: 0.1s; display: flex; align-items: center; gap: 6px;
+        }
+        .file-item:hover { background-color: var(--item-hover-bg); }
+        .file-item.active { background-color: var(--item-active-bg); color: var(--item-active-text); }
+        .empty-state { color: #888; font-size: 0.9rem; text-align: center; margin-top: 20px; }
+
+        #editor-container { flex-grow: 1; display: flex; flex-direction: column; padding: 15px; min-width: 0; }
+        #editor { background-color: #fff; border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; }
+        body.dark-theme #editor { background-color: #1e1e1e; border: 1px solid var(--border-color); }
+
+        .toastui-editor-mode-switch, .toastui-editor-md-tab-container { display: none !important; }
+    </style>
+    <style id="dynamic-image-styles"></style>
+</head>
+<body>
+
+    <header>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <button id="btn-toggle-sidebar" class="btn-secondary" title="Toggle Sidebar">☰</button>
+            <img src="smde_icon.png" width="24px" height="24px">
+            <h1>Simply Markdown Editor v1.0</h1>
+        </div>
+        
+        <div class="view-modes">
+            <button id="view-md" class="btn-view">#️⃣  Markdown</button>
+            <button id="view-compare" class="btn-view">🪟 Compare</button>
+            <button id="view-wysiwyg" class="btn-view active">👀 ️WYSIWYG</button>
+        </div>
+
+        <div class="toolbar-group">
+            <button id="btn-undo" class="btn-secondary" title="Undo">↩️ Undo</button>
+            <button id="btn-redo" class="btn-secondary" title="Redo">↪️ Redo</button>
+            <div class="header-divider"></div>
+            <button id="btn-theme" class="btn-secondary">🌙 Theme</button>
+            <button id="btn-new" class="btn-secondary">📄 New</button>
+            <button id="btn-open-folder">📂 Workspace</button>
+            <button id="btn-export" class="btn-secondary">📤 Export HTML</button>
+            <button id="btn-save">💾 Save</button>
+        </div>
+    </header>
+
+    <div id="main-layout">
+        <div id="sidebar">
+            <div class="sidebar-search-container">
+                <input type="text" id="file-search" placeholder="🔍 Search files & images...">
+                <div id="workspace-path">📁 No workspace loaded</div>
+            </div>
+            <div class="sidebar-scroll-area" id="tree-container">
+                <div class="empty-state">Open a workspace to see your files.</div>
+            </div>
+        </div>
+
+        <div id="editor-container">
+            <div id="editor"></div>
+        </div>
+    </div>
+
+    <script src="toastui-editor-all.min.js"></script>
+
+    <!-- ORIGINAL SOURCE ONLINE
+    <script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+    -->
+
+    <script>
+        let dirHandle = null;
+        let currentFileHandle = null;
+        let fileHandles = { md: {}, img: {} }; 
+        let imageBlobUrls = {};
+        let lastSavedContent = "";
+
+        const systemIsDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (systemIsDark) {
+            document.body.classList.add('dark-theme');
+        }
+
+        // --- SECTION 1: GLOBAL LAYOUT & CONTROL EVENT LISTENERS ---
+
+        const viewBtns = [document.getElementById('view-md'), document.getElementById('view-compare'), document.getElementById('view-wysiwyg')];
+        function setActiveView(activeBtn) {
+            viewBtns.forEach(btn => btn.classList.remove('active'));
+            activeBtn.classList.add('active');
+        }
+
+        document.getElementById('view-md').addEventListener('click', function() {
+            if (window.editor) { editor.changeMode('markdown'); editor.changePreviewStyle('tab'); }
+            setActiveView(this);
+        });
+
+        document.getElementById('view-compare').addEventListener('click', function() {
+            if (window.editor) { editor.changeMode('markdown'); editor.changePreviewStyle('vertical'); }
+            setActiveView(this);
+        });
+
+        document.getElementById('view-wysiwyg').addEventListener('click', function() {
+            if (window.editor) { editor.changeMode('wysiwyg'); }
+            setActiveView(this);
+        });
+
+        document.getElementById('btn-undo').addEventListener('click', () => { if (window.editor) editor.exec('undo'); });
+        document.getElementById('btn-redo').addEventListener('click', () => { if (window.editor) editor.exec('redo'); });
+
+        const btnTheme = document.getElementById('btn-theme');
+        btnTheme.addEventListener('click', () => {
+            document.body.classList.toggle('dark-theme');
+            const isDark = document.body.classList.contains('dark-theme');
+            btnTheme.textContent = isDark ? '🌙 Dark' : '☀️ Light';
+            const editorUI = document.querySelector('.toastui-editor-defaultUI');
+            if (editorUI) isDark ? editorUI.classList.add('toastui-editor-dark') : editorUI.classList.remove('toastui-editor-dark');
+        });
+
+        document.getElementById('btn-toggle-sidebar').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        });
+
+        document.getElementById('file-search').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const treeContainer = document.getElementById('tree-container');
+            const lockedScrollY = treeContainer.scrollTop; 
+            
+            const files = document.querySelectorAll('.file-item');
+            const folders = document.querySelectorAll('details');
+            
+            files.forEach(item => {
+                const name = item.getAttribute('data-name').toLowerCase();
+                if (name.includes(query)) {
+                    item.style.display = 'flex';
+                    let parent = item.parentElement;
+                    while(parent && parent.id !== 'tree-container') {
+                        if(parent.tagName === 'DETAILS') {
+                            parent.style.display = 'block';
+                            if(query !== '') parent.open = true; 
+                        }
+                        parent = parent.parentElement;
+                    }
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+
+            if (query === '') {
+                folders.forEach(f => f.style.display = 'block');
+            } else {
+                folders.forEach(folder => {
+                    const hasVisibleFile = Array.from(folder.querySelectorAll('.file-item')).some(el => el.style.display !== 'none');
+                    folder.style.display = hasVisibleFile ? 'block' : 'none';
+                });
+            }
+            setTimeout(() => { treeContainer.scrollTop = lockedScrollY; }, 0);
+        });
+
+        // NEW FILE LOGIC
+        document.getElementById('btn-new').addEventListener('click', async () => {
+            if (editor.getMarkdown() !== lastSavedContent) {
+                const applyChanges = confirm(`You have unsaved changes.\n\nClick OK to SAVE before creating a new file.\nClick Cancel to DISCARD modifications.`);
+                if (applyChanges) {
+                    const saved = await saveCurrentFile();
+                    if (!saved) return; 
+                }
+            }
+
+            currentFileHandle = null;
+            editor.setMarkdown('');
+            lastSavedContent = '';
+            document.title = 'Untitled - Simply Markdown Editor v1.0';
+            document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+        });
+
+        document.getElementById('btn-open-folder').addEventListener('click', async () => {
+            try {
+                dirHandle = await window.showDirectoryPicker();
+                fileHandles = { md: {}, img: {} };
+                imageBlobUrls = {};
+                
+                document.getElementById('workspace-path').textContent = `📁 Workspace: ${dirHandle.name}`;
+                
+                const treeContainer = document.getElementById('tree-container');
+                treeContainer.innerHTML = ''; 
+                document.getElementById('file-search').value = '';
+                
+                const imagePromises = []; 
+                await buildTree(dirHandle, '', treeContainer, imagePromises);
+                
+                await Promise.all(imagePromises);
+                generateSecureImageCSS();
+                
+                if (treeContainer.innerHTML === '') {
+                    treeContainer.innerHTML = '<div class="empty-state">No .md files or images found.</div>';
+                }
+            } catch (error) {
+                if (error.name !== 'AbortError') console.error(error);
+            }
+        });
+
+        // UPDATED SAVE TRIGGER: Removed the initial block preventing new files from saving
+        document.getElementById('btn-save').addEventListener('click', async () => {
+            if (await saveCurrentFile()) {
+                alert('File saved successfully!');
+            }
+        });
+
+        document.getElementById('btn-export').addEventListener('click', async () => {
+            try {
+                const rawHTML = editor.getHTML();
+                const titleText = currentFileHandle ? currentFileHandle.name.replace('.md', '') : 'Exported Document';
+                
+                const structuralHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${titleText}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 40px 20px; }
+        img { max-width: 100%; height: auto; border-radius: 4px; }
+        pre { background: #f4f5f7; padding: 15px; border-radius: 6px; overflow-x: auto; font-family: monospace; }
+        code { font-family: monospace; background: #f4f5f7; padding: 2px 6px; border-radius: 4px; color: #d63384; font-size: 0.9em; }
+        pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+        blockquote { border-left: 4px solid #3498db; margin: 0; padding-left: 20px; color: #666; font-style: italic; }
+        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+        th, td { border: 1px solid #dfe2e5; padding: 8px 12px; text-align: left; }
+        th { background-color: #f6f8fa; }
+    </style>
+</head>
+<body>
+    ${rawHTML}
+</body>
+</html>`;
+
+                if ('showSaveFilePicker' in window) {
+                    const suggestedFile = currentFileHandle ? currentFileHandle.name.replace('.md', '.html') : 'Untitled.html';
+                    const fileHandle = await window.showSaveFilePicker({
+                        suggestedName: suggestedFile,
+                        types: [{ description: 'HTML Document', accept: { 'text/html': ['.html'] } }]
+                    });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(structuralHTML);
+                    await writable.close();
+                    alert('Document exported to HTML successfully!');
+                } else {
+                    const blob = new Blob([structuralHTML], { type: 'text/html' });
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = URL.createObjectURL(blob);
+                    downloadLink.download = currentFileHandle ? currentFileHandle.name.replace('.md', '.html') : 'Document.html';
+                    downloadLink.click();
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error(err);
+                    alert('Failed to export HTML document.');
+                }
+            }
+        });
+
+
+        // --- SECTION 2: CORE EDITOR COMPILATION ---
+
+        window.editor = new toastui.Editor({
+            el: document.querySelector('#editor'),
+            height: '100%',
+            initialEditType: 'wysiwyg',
+            previewStyle: 'vertical',
+            initialValue: '# Simply Markdown Editor\n\n1. Click **📂 Workspace** to open a local folder.\n2. Use the top buttons to swap between **#️⃣ Markdown**, **🪟 Compare**, and **👀 WYSIWYG** views.\n3. Click any 🖼️ image in the sidebar to securely insert it into your document.\n\nSimply Markdown Editor v1.0 - Created by FreedomPortal (<a href="https://github.com/FreedomPortal/SimplyMarkdownEditor/">https://github.com/FreedomPortal/SimplyMarkdownEditor/</a>)',
+            toolbarItems: [
+                ['heading', 'bold', 'italic', 'strike'],
+                ['hr', 'quote'],
+                ['ul', 'ol', 'task', 'indent', 'outdent'],
+                ['table', 'link'], 
+                ['code', 'codeblock'],
+            ],
+            hooks: {
+                addImageBlobHook: (blob, callback) => {
+                    alert('To insert images cleanly, click an image in the left sidebar.');
+                    return null; 
+                }
+            }
+        });
+
+        setTimeout(() => {
+            try {
+                lastSavedContent = editor.getMarkdown();
+                const editorUI = document.querySelector('.toastui-editor-defaultUI');
+                if (editorUI && document.body.classList.contains('dark-theme')) {
+                    editorUI.classList.add('toastui-editor-dark');
+                    document.getElementById('btn-theme').textContent = '🌙️ Dark';
+                } else {
+                    document.getElementById('btn-theme').textContent = '☀ Light';
+                }
+            } catch (e) {
+                console.error("Editor internal theme syncing deferred safely:", e);
+            }
+        }, 50);
+
+
+        // --- SECTION 3: CORE DATA FILE & SYSTEM ENGINES ---
+
+        async function buildTree(handle, currentPath, parentNode, imagePromises) {
+            const entries = [];
+            for await (const entry of handle.values()) {
+                if (entry.name.startsWith('.')) continue;
+                entries.push(entry);
+            }
+            
+            entries.sort((a, b) => {
+                if (a.kind === b.kind) return a.name.localeCompare(b.name);
+                return a.kind === 'directory' ? -1 : 1;
+            });
+
+            for (const entry of entries) {
+                const relativePath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+                
+                if (entry.kind === 'file') {
+                    if (entry.name.endsWith('.md')) {
+                        fileHandles.md[relativePath] = entry;
+                        
+                        const div = document.createElement('div');
+                        div.className = 'file-item';
+                        div.setAttribute('data-name', entry.name);
+                        div.innerHTML = `📄 <span>${entry.name}</span>`;
+                        
+                        // Automatically re-highlight the active file if it matches the current document
+                        if (currentFileHandle && await entry.isSameEntry(currentFileHandle)) {
+                            div.classList.add('active');
+                        }
+
+                        div.onclick = () => loadFile(relativePath, entry, div);
+                        parentNode.appendChild(div);
+                    } 
+                    else if (/\.(png|jpe?g|gif|svg|webp)$/i.test(entry.name)) {
+                        fileHandles.img[relativePath] = entry;
+                        
+                        imagePromises.push(
+                            entry.getFile().then(file => {
+                                imageBlobUrls[relativePath] = URL.createObjectURL(file);
+                            })
+                        );
+
+                        const div = document.createElement('div');
+                        div.className = 'file-item';
+                        div.setAttribute('data-name', entry.name);
+                        div.innerHTML = `🖼️ <span>${entry.name}</span>`;
+                        div.title = "Click to insert into document";
+                        
+                        div.onclick = () => {
+                            editor.exec('addImage', {
+                                imageUrl: encodeURI(relativePath),
+                                altText: entry.name
+                            });
+                        };
+                        parentNode.appendChild(div);
+                    }
+                } 
+                else if (entry.kind === 'directory') {
+                    const details = document.createElement('details');
+                    details.open = true; 
+                    
+                    const summary = document.createElement('summary');
+                    summary.innerHTML = `📁 ${entry.name}`;
+                    details.appendChild(summary);
+                    
+                    const folderContent = document.createElement('div');
+                    folderContent.className = 'folder-content';
+                    details.appendChild(folderContent);
+                    parentNode.appendChild(details);
+                    
+                    await buildTree(entry, relativePath, folderContent, imagePromises);
+                    
+                    if (folderContent.children.length === 0) {
+                        details.remove();
+                    } else {
+                        if (currentPath !== '') details.open = false; 
+                    }
+                }
+            }
+        }
+
+        const cStart = '<' + '!--';
+        const cEnd = '--' + '>';
+        const protectRegex = new RegExp(cStart + '([\\s\\S]*?)' + cEnd, 'g');
+        const restoreRegex = new RegExp('```html\\s*[\\r\\n]+' + cStart + 'PRESERVED_COMMENT[\\r\\n]+([\\s\\S]*?)' + cEnd + '\\s*[\\r\\n]+```', 'g');
+
+        function protectComments(text) {
+            return text.replace(protectRegex, (match, p1) => {
+                return '```html\n' + cStart + 'PRESERVED_COMMENT\n' + p1 + cEnd + '\n```';
+            });
+        }
+
+        function restoreComments(text) {
+            return text.replace(restoreRegex, cStart + '$1' + cEnd);
+        }
+
+
+        // 1. Utility to completely wipe and refresh the sidebar memory
+        async function refreshWorkspace() {
+            if (!dirHandle) return;
+            
+            // FIX: Completely clear the memory cache so ghost files don't linger
+            fileHandles = { md: {}, img: {} };
+            imageBlobUrls = {};
+            
+            const treeContainer = document.getElementById('tree-container');
+            const lockedScrollY = treeContainer.scrollTop; 
+            
+            treeContainer.innerHTML = '';
+            const imagePromises = [];
+            await buildTree(dirHandle, '', treeContainer, imagePromises);
+            await Promise.all(imagePromises);
+            generateSecureImageCSS();
+            
+            treeContainer.scrollTop = lockedScrollY;
+        }
+
+        // 2. The Native 'Save As' Dialog Trigger
+        async function promptSaveAs() {
+            try {
+                const pickerOptions = {
+                    suggestedName: currentFileHandle ? currentFileHandle.name : 'Untitled.md',
+                    types: [{ description: 'Markdown File', accept: { 'text/markdown': ['.md'] } }]
+                };
+                // Route directly into the workspace folder
+                if (dirHandle) pickerOptions.startIn = dirHandle; 
+                
+                currentFileHandle = await window.showSaveFilePicker(pickerOptions);
+                
+                const writable = await currentFileHandle.createWritable();
+                const content = editor.getMarkdown();
+                const restoredContent = restoreComments(content);
+                await writable.write(restoredContent);
+                await writable.close();
+                
+                lastSavedContent = content; 
+                document.title = `${currentFileHandle.name} - Simply Markdown Editor v1.0`;
+
+                // Instantly update sidebar to show the brand new file
+                await refreshWorkspace();
+                setTimeout(() => {
+                    document.querySelectorAll('.file-item').forEach(el => {
+                        if (el.getAttribute('data-name') === currentFileHandle.name) el.classList.add('active');
+                    });
+                }, 50);
+                
+                return true;
+            } catch (err) {
+                return false; // User clicked "Cancel" on the native Save prompt
+            }
+        }
+
+        // 3. The Master Save Engine
+        async function saveCurrentFile() {
+            if (!currentFileHandle) {
+                return await promptSaveAs();
+            }
+
+            try {
+                const writable = await currentFileHandle.createWritable();
+                const content = editor.getMarkdown();
+                const restoredContent = restoreComments(content);
+                
+                await writable.write(restoredContent);
+                await writable.close();
+                
+                lastSavedContent = content; 
+                document.title = `${currentFileHandle.name} - Simply Markdown Editor v1.0`;
+
+                await refreshWorkspace();
+                setTimeout(() => {
+                    document.querySelectorAll('.file-item').forEach(el => {
+                        if (el.getAttribute('data-name') === currentFileHandle.name) el.classList.add('active');
+                    });
+                }, 50);
+
+                return true;
+            } catch (error) {
+                // FIX: If the file was deleted in Windows/Mac, immediately catch it!
+                alert('⚠️ The original file is missing or inaccessible. Please choose a new location to save your text.');
+                currentFileHandle = null; 
+                await refreshWorkspace();    // Wipes the ghost file from the sidebar
+                return await promptSaveAs(); // Immediately shows the Save As prompt!
+            }
+        }
+
+        // 4. Load File & Protect Sidebar Scroll
+        async function loadFile(path, handle, element) {
+            const treeContainer = document.getElementById('tree-container');
+            const lockedScrollY = treeContainer.scrollTop; 
+
+            // Intercept unsaved changes
+            if (currentFileHandle && editor.getMarkdown() !== lastSavedContent) {
+                const applyChanges = confirm(`"${currentFileHandle.name}" has unsaved changes.\n\nClick OK to SAVE modifications.\nClick Cancel to DISCARD modifications.`);
+                if (applyChanges) {
+                    const saved = await saveCurrentFile();
+                    if (!saved) return; 
+                }
+            }
+
+            try {
+                // FIX: If user clicks a deleted file in the sidebar, this safely catches the crash
+                const file = await handle.getFile();
+                const text = await file.text();
+                
+                currentFileHandle = handle;
+                const protectedText = protectComments(text);
+                editor.setMarkdown(protectedText);
+                
+                lastSavedContent = editor.getMarkdown(); 
+                
+                if (typeof editor.moveCursorToStart === 'function') {
+                    editor.moveCursorToStart();
+                }
+
+                const mdScroll = document.querySelector('.toastui-editor-md-container .toastui-editor-md-scroll');
+                const wwScroll = document.querySelector('.toastui-editor-ww-container .toastui-editor-ww-scroll');
+                if (mdScroll) mdScroll.scrollTop = 0;
+                if (wwScroll) wwScroll.scrollTop = 0;
+
+                document.title = `${handle.name} - Simply Markdown Editor v1.0`;
+
+                document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+                element.classList.add('active');
+
+                setTimeout(() => { treeContainer.scrollTop = lockedScrollY; }, 0);
+
+            } catch (error) {
+                alert('⚠️ This file no longer exists on your disk. The workspace will now refresh.');
+                await refreshWorkspace();
+            }
+        }
+
+        function generateSecureImageCSS() {
+            let css = '';
+            const prefix1 = '.toastui-editor-contents img';
+            const prefix2 = '.ProseMirror img';
+            
+            for (const [path, url] of Object.entries(imageBlobUrls)) {
+                const safePath = path.replace(/(["\\])/g, '\\$1');
+                const encodedPath = encodeURI(path).replace(/(["\\])/g, '\\$1');
+                
+                css += `${prefix1}[src="${safePath}"], ${prefix2}[src="${safePath}"], ` +
+                       `${prefix1}[src="./${safePath}"], ${prefix2}[src="./${safePath}"], ` +
+                       `${prefix1}[src="${encodedPath}"], ${prefix2}[src="${encodedPath}"], ` +
+                       `${prefix1}[src="./${encodedPath}"], ${prefix2}[src="./${encodedPath}"] ` +
+                       `{ content: url("${url}") !important; }\n`;
+            }
+            document.getElementById('dynamic-image-styles').textContent = css;
+        }
+    </script>
+</body>
+</html>
