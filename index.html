@@ -203,6 +203,10 @@
         let fileHandles = { md: {}, img: {} }; 
         let imageBlobUrls = {};
         let lastSavedContent = "";
+        let currentFileCRLF = false;   // Preserve original line endings on save
+        let htmlBlockMap = [];          // Maps normalized HTML → original HTML for save reconstruction
+        let normalizedBaseline = "";    // editor.getMarkdown() baseline right after file load
+        let markdownStyles = {};        // Original doc's syntax style preferences (HR, list, bold, italic, etc.)
 
         const systemIsDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         if (systemIsDark) {
@@ -228,7 +232,19 @@
         });
 
         document.getElementById('view-wysiwyg').addEventListener('click', function() {
-            if (window.editor) { editor.changeMode('wysiwyg'); }
+            if (window.editor) {
+                // Capture raw content BEFORE the mode switch causes ProseMirror normalization
+                const rawBeforeSwitch = editor.getMarkdown();
+                editor.changeMode('wysiwyg');
+                // Rebuild map now that ProseMirror has normalized the content
+                setTimeout(() => {
+                    const normalizedAfterSwitch = editor.getMarkdown();
+                    if (rawBeforeSwitch !== normalizedAfterSwitch) {
+                        htmlBlockMap = buildHTMLBlockMap(rawBeforeSwitch, normalizedAfterSwitch);
+                        normalizedBaseline = normalizedAfterSwitch;
+                    }
+                }, 0);
+            }
             setActiveView(this);
         });
 
@@ -295,6 +311,10 @@
             }
 
             currentFileHandle = null;
+            currentFileCRLF = false;
+            htmlBlockMap = [];
+            normalizedBaseline = "";
+            markdownStyles = {};
             editor.setMarkdown('');
             lastSavedContent = '';
             document.title = 'Untitled - Simply Markdown Editor v1.0';
@@ -524,6 +544,147 @@
             return text.replace(restoreRegex, cStart + '$1' + cEnd);
         }
 
+        // --- HTML BLOCK RECONSTRUCTION ENGINE ---
+        // Rather than protecting HTML at load time (which breaks WYSIWYG rendering),
+        // we let the editor load and display normally, then on save we reconstruct
+        // the original HTML blocks by matching them via index order.
+        //
+        // How it works:
+        //   1. On load: store what the editor normalizes the file into (normalizedBaseline)
+        //   2. Build a map: normalized-HTML-string → original-HTML-string (by order of appearance)
+        //   3. On save: apply the map to editor.getMarkdown(), restoring original HTML
+        //
+        // Code-fence sections are skipped so protectComments doesn't interfere.
+
+        function extractHTMLBlockStrings(text) {
+            const lines = text.split('\n');
+            const blocks = [];
+            let inBlock = false;
+            let blockLines = [];
+            let inCodeFence = false;
+
+            for (const line of lines) {
+                if (/^```/.test(line)) {
+                    inCodeFence = !inCodeFence;
+                    if (inBlock) {
+                        blocks.push(blockLines.join('\n'));
+                        blockLines = [];
+                        inBlock = false;
+                    }
+                    continue;
+                }
+                if (inCodeFence) continue;
+
+                if (!inBlock) {
+                    if (/^<[a-zA-Z!\/]/.test(line)) {
+                        inBlock = true;
+                        blockLines = [line];
+                    }
+                } else {
+                    if (line.trim() === '') {
+                        blocks.push(blockLines.join('\n'));
+                        blockLines = [];
+                        inBlock = false;
+                    } else {
+                        blockLines.push(line);
+                    }
+                }
+            }
+            if (inBlock && blockLines.length > 0) blocks.push(blockLines.join('\n'));
+            return blocks;
+        }
+
+        function buildHTMLBlockMap(editorSource, normalizedContent) {
+            const rawBlocks  = extractHTMLBlockStrings(editorSource);
+            const normBlocks = extractHTMLBlockStrings(normalizedContent);
+            const map = [];
+            const len = Math.min(rawBlocks.length, normBlocks.length);
+            for (let i = 0; i < len; i++) {
+                if (rawBlocks[i] !== normBlocks[i]) {
+                    map.push({ raw: rawBlocks[i], normalized: normBlocks[i] });
+                }
+            }
+            return map;
+        }
+
+        function reconstructHTMLBlocks(text, map) {
+            let result = text;
+            for (const { raw, normalized } of map) {
+                // split+join avoids regex escaping issues with complex HTML
+                result = result.split(normalized).join(raw);
+            }
+            return result;
+        }
+
+        // Detect the syntax style conventions the original file uses.
+        // ProseMirror normalises all of these to its own canonical form on every
+        // getMarkdown() call; we detect once on load and restore on every save.
+        function detectMarkdownStyles(text) {
+            return {
+                // Horizontal rules: --- or ___ → ProseMirror always writes ***
+                hr:         text.match(/^(---|___)$/m)?.[1] ?? null,
+
+                // Unordered list marker: - or + → ProseMirror always writes *
+                listMarker: text.match(/^[ \t]*(-|\+) /m)?.[1] ?? null,
+
+                // Bold delimiter: __ → ProseMirror always writes **
+                bold:       /__\S/.test(text) ? '__' : null,
+
+                // Italic delimiter: * (no space) → ProseMirror always writes _
+                italic:     /(?<!\*)\*(?!\*)\S/.test(text) ? '*' : null,
+
+                // Bold+italic combo style: _** or **_ → ProseMirror always writes ***
+                boldItalic: /_\*\*\S/.test(text) ? '_**' :
+                            /\*\*_\S/.test(text) ? '**_' : null,
+            };
+        }
+
+        // Restore all original style conventions in a serialized markdown string.
+        // Order matters — bold before boldItalic so *** (3-star) is left untouched
+        // in step 1; italic before boldItalic so the _.._ we introduce in step 3
+        // isn't re-processed; list markers after emphasis to avoid false positives.
+        function restoreMarkdownStyles(text, styles) {
+            let result = text;
+
+            // 1. Bold: **text** → __text__
+            //    Negative lookahead/lookbehind ensures we don't touch *** (boldItalic)
+            if (styles.bold) {
+                result = result.replace(
+                    /(?<!\*)\*\*(?!\*)([^*\n]+)(?<!\*)\*\*(?!\*)/g,
+                    '__$1__'
+                );
+            }
+
+            // 2. Italic: _text_ → *text*
+            //    Negative lookahead/lookbehind on _ avoids matching inside __bold__
+            if (styles.italic) {
+                result = result.replace(
+                    /(?<!_)_(?!_)([^_\n]+)(?<!_)_(?!_)/g,
+                    '*$1*'
+                );
+            }
+
+            // 3. Bold+italic combo: ***text*** → _**text**_ or **_text_**
+            if (styles.boldItalic) {
+                const open  = styles.boldItalic;
+                const close = styles.boldItalic === '_**' ? '**_' : '_**';
+                result = result.replace(/\*\*\*([^*\n]+)\*\*\*/g, `${open}$1${close}`);
+            }
+
+            // 4. Unordered list markers: * item → - item or + item
+            //    Line-anchored so it only matches actual list markers, not inline *
+            if (styles.listMarker) {
+                result = result.replace(/^([ \t]*)\* /gm, `$1${styles.listMarker} `);
+            }
+
+            // 5. Horizontal rules: standalone *** line → --- or ___
+            if (styles.hr) {
+                result = result.replace(/^\*\*\*$/gm, styles.hr);
+            }
+
+            return result;
+        }
+
 
         // 1. Utility to completely wipe and refresh the sidebar memory
         async function refreshWorkspace() {
@@ -559,11 +720,10 @@
                 
                 const writable = await currentFileHandle.createWritable();
                 const content = editor.getMarkdown();
-                const restoredContent = restoreComments(content);
-                await writable.write(restoredContent);
+                const restoredContent = restoreMarkdownStyles(restoreComments(reconstructHTMLBlocks(content, htmlBlockMap)), markdownStyles);
+                const finalContent = currentFileCRLF ? restoredContent.replace(/\n/g, '\r\n') : restoredContent;
+                await writable.write(finalContent);
                 await writable.close();
-                
-                lastSavedContent = content; 
                 document.title = `${currentFileHandle.name} - Simply Markdown Editor v1.0`;
 
                 // Instantly update sidebar to show the brand new file
@@ -589,9 +749,10 @@
             try {
                 const writable = await currentFileHandle.createWritable();
                 const content = editor.getMarkdown();
-                const restoredContent = restoreComments(content);
+                const restoredContent = restoreMarkdownStyles(restoreComments(reconstructHTMLBlocks(content, htmlBlockMap)), markdownStyles);
+                const finalContent = currentFileCRLF ? restoredContent.replace(/\n/g, '\r\n') : restoredContent;
                 
-                await writable.write(restoredContent);
+                await writable.write(finalContent);
                 await writable.close();
                 
                 lastSavedContent = content; 
@@ -632,12 +793,26 @@
                 // FIX: If user clicks a deleted file in the sidebar, this safely catches the crash
                 const file = await handle.getFile();
                 const text = await file.text();
-                
+
+                // Preserve original line endings for lossless save round-trip
+                currentFileCRLF = text.includes('\r\n');
+                const normalizedText = currentFileCRLF ? text.replace(/\r\n/g, '\n') : text;
+
+                markdownStyles = detectMarkdownStyles(normalizedText);
+
+                // Protect HTML comments so they survive WYSIWYG round-trip as code fences.
+                // Other HTML blocks are NOT fenced here — WYSIWYG renders them normally.
+                // Their attributes are reconstructed at save time via htmlBlockMap.
+                const editorSource = protectComments(normalizedText);
+
                 currentFileHandle = handle;
-                const protectedText = protectComments(text);
-                editor.setMarkdown(protectedText);
-                
-                lastSavedContent = editor.getMarkdown(); 
+                editor.setMarkdown(editorSource);
+
+                // Build map AFTER setMarkdown so getMarkdown() reflects ProseMirror normalization
+                normalizedBaseline = editor.getMarkdown();
+                htmlBlockMap = buildHTMLBlockMap(editorSource, normalizedBaseline);
+
+                lastSavedContent = normalizedBaseline;
                 
                 if (typeof editor.moveCursorToStart === 'function') {
                     editor.moveCursorToStart();
